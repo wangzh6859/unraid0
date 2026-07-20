@@ -23,7 +23,10 @@ if (hasKeystore) {
 android {
     namespace = "com.zhaohongli.unraidmobile"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // 显式指定为插件里要求的最高 NDK 版本（package_info_plus /
+    // shared_preferences_android / url_launcher_android 等都要求 27.x），
+    // 不能用 flutter.ndkVersion 的默认值，否则会因为版本不一致构建失败。
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
