@@ -1,0 +1,87 @@
+name: Build & Release APK
+
+# 每次 push 到 main 分支，或手动点击 "Run workflow" 都会触发一次云端打包，
+# 打包完成后会自动创建一个 GitHub Release，并把 APK 作为附件上传。
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.29.0'
+          channel: 'stable'
+          cache: true
+
+      - name: 生成 Android 平台工程（首次会创建 android/ 目录，已存在的文件不会被覆盖）
+        run: flutter create --platforms=android --org com.zhaohongli --project-name unraid_mobile .
+
+      - name: 应用自定义签名构建配置
+        run: cp android_overrides/app_build.gradle.kts android/app/build.gradle.kts
+
+      - name: 解码签名证书
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::缺少 KEYSTORE_BASE64 secret，请先运行 generate-keystore.yml 生成证书并把它设置到仓库 Secrets 中"
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.jks
+
+      - name: 写入 key.properties
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          cat > android/key.properties <<EOF
+          storeFile=release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: 获取依赖
+        run: flutter pub get
+
+      - name: 构建 Release APK
+        run: |
+          BUILD_NUMBER="${{ github.run_number }}"
+          # versionCode 用 GitHub Actions 的运行次数，保证每次构建都严格递增，
+          # 这是手机能够"原地升级安装"而不需要先卸载旧版的关键条件之一
+          # （另一个条件是每次都用同一份签名证书，已经在上面处理）。
+          flutter build apk --release \
+            --build-name="1.0.$BUILD_NUMBER" \
+            --build-number="$BUILD_NUMBER"
+
+      - name: 重命名产物
+        run: |
+          mkdir -p dist
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             "dist/unraid-mobile-1.0.${{ github.run_number }}.apk"
+
+      - name: 创建 GitHub Release 并上传 APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Unraid Mobile v1.0.${{ github.run_number }}
+          body: |
+            自动构建版本 1.0.${{ github.run_number }}（commit ${{ github.sha }}）
+
+            手机上直接点击下方 apk 文件下载并安装即可，会自动覆盖升级旧版本，无需先卸载。
+          files: dist/*.apk
+          generate_release_notes: false
