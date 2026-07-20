@@ -1,0 +1,38 @@
+name: unraid_mobile
+description: "一个用于远程管理 Unraid NAS 的手机应用"
+publish_to: 'none'
+
+# version 会在 CI 构建时通过 --build-name / --build-number 覆盖，
+# 这里的值仅用于本地开发时的占位。
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # 网络请求（GraphQL over HTTP）
+  http: ^1.2.2
+
+  # 本地存储（NAS地址 / API Key / 主题偏好）
+  shared_preferences: ^2.3.2
+
+  # 精美字体
+  google_fonts: ^6.2.1
+
+  # 点击后用系统浏览器打开 GitHub Release 页面下载新 APK
+  url_launcher: ^6.3.1
+
+  # 读取当前已安装 App 的版本号，用于"检查更新"对比
+  package_info_plus: ^8.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
