@@ -129,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   Switch(
                     value: _useHttps,
-                    activeThumbColor: AppColors.orange,
+                    activeColor: AppColors.orange,
                     onChanged: (v) => setState(() => _useHttps = v),
                   ),
                   const Text('使用 HTTPS',
