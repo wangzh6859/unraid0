@@ -21,7 +21,7 @@ class UpdateInfo {
 
 class UpdateService {
   /// 修改为你自己的 "用户名/仓库名"
-  static const String githubRepo = 'YOUR_GITHUB_USERNAME/unraid-mobile';
+  static const String githubRepo = 'wangzh6859/unraid0';
 
   Future<UpdateInfo?> checkForUpdate() async {
     try {
