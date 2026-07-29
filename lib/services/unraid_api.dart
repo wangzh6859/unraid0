@@ -101,7 +101,7 @@ class UnraidApi {
     return data['info']?['os']?['hostname'] ?? 'Unraid';
   }
 
-  /// 拉取仪表盘数据：系统信息 + CPU/内存利用率 + 阵列状态 + GPU + 网卡。
+  /// 拉取仪表盘数据：系统信息 + CPU/内存利用率 + 阵列状态 + 网卡 + 磁盘详情。
   Future<SystemStats> fetchSystemStats() async {
     const query = r'''
       query Dashboard {
@@ -116,8 +116,16 @@ class UnraidApi {
         }
         array {
           state
-          disks { name device status temp type fsSize fsUsed }
-          caches { name device status temp type fsSize fsUsed }
+          capacity { kilobytes { free used total } }
+          disks { name device status temp type fsSize fsUsed isSpinning }
+          caches { name device status temp type fsSize fsUsed isSpinning }
+        }
+        disks {
+          device
+          vendor
+          smartStatus
+          interfaceType
+          serialNum
         }
       }
     ''';
