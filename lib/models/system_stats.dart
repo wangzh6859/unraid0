@@ -46,7 +46,7 @@ class SystemStats {
     final packages = cpu['packages'] ?? {};
     final devices = info['devices'] ?? {};
     final gpuList = (devices['gpu'] as List?) ?? [];
-    final netList = (info['networkInterfaces'] as List?) ?? [];
+    final netList = (devices['network'] as List?) ?? [];
 
     final metrics = json['metrics'] ?? {};
     final metricsCpu = metrics['cpu'] ?? {};
@@ -223,24 +223,24 @@ class GpuInfo {
 }
 
 class NetworkInterfaceInfo {
-  final String name;
-  final String? status;
-  final String? ipAddress;
+  final String iface;
+  final String? model;
+  final String? speed;
 
   NetworkInterfaceInfo({
-    required this.name,
-    required this.status,
-    required this.ipAddress,
+    required this.iface,
+    required this.model,
+    required this.speed,
   });
 
   factory NetworkInterfaceInfo.fromJson(Map<String, dynamic> json) {
     return NetworkInterfaceInfo(
-      name: json['name'] ?? '未知网卡',
-      status: json['status'],
-      ipAddress: json['ipAddress'],
+      iface: json['iface'] ?? '未知网卡',
+      model: json['model'],
+      speed: json['speed'],
     );
   }
 
-  bool get isConnected =>
-      status != null && status!.toLowerCase().contains('up');
+  /// 官方 API 这里只暴露网卡协商链路速度（比如 "1000"），不是实时占用率
+  String get speedLabel => (speed != null && speed!.isNotEmpty) ? '$speed Mbps' : '未知带宽';
 }
