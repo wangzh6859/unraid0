@@ -313,12 +313,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 subtitle: '共 ${stats.memTotalLabel}',
               ),
               StatCard(
-                title: 'GPU',
-                value: stats.gpus.isNotEmpty ? stats.gpus.first.displayName : '未检测到',
-                icon: Icons.videogame_asset_rounded,
+                title: 'CPU 频率',
+                value: stats.cpuSpeedGhz != null
+                    ? '${stats.cpuSpeedGhz!.toStringAsFixed(2)} GHz'
+                    : '暂不支持',
+                icon: Icons.speed_rounded,
                 gradient: LinearGradient(
                     colors: [AppColors.blue, AppColors.blue.withValues(alpha: 0.6)]),
-                subtitle: '官方 API 暂不提供占用率',
               ),
             ],
           ),
