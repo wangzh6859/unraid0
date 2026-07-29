@@ -108,8 +108,7 @@ class UnraidApi {
         info {
           os { hostname distro uptime }
           cpu { manufacturer brand cores threads packages { temp totalPower } }
-          devices { gpu { type vendorname } }
-          networkInterfaces { name status ipAddress }
+          devices { gpu { type vendorname } network { iface model speed } }
         }
         metrics {
           cpu { percentTotal }
@@ -138,7 +137,6 @@ class UnraidApi {
             state
             status
             autoStart
-            iconUrl
           }
         }
       }
