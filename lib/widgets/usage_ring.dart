@@ -37,23 +37,31 @@ class UsageRing extends StatelessWidget {
                   valueColor: AlwaysStoppedAnimation(color),
                 ),
               ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '${clamped.toStringAsFixed(0)}%',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${clamped.toStringAsFixed(0)}%',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                  ),
-                  Text(
-                    centerLabel,
-                    style: const TextStyle(
-                        fontSize: 10, color: AppColors.textFaint),
-                  ),
-                ],
+                    if (centerLabel.isNotEmpty)
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          centerLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 10, color: AppColors.textFaint),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),
