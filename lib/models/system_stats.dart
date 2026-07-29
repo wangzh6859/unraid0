@@ -9,15 +9,15 @@ class SystemStats {
   final int cpuThreads;
   final double cpuPercent;
   final List<double> cpuPackageTemps; // °C，每个物理封装一个
+  final double? cpuSpeedGhz;
 
   final double memPercent;
   final int memTotalBytes;
   final int memUsedBytes;
 
   final String arrayState;
+  final ArrayCapacityInfo capacity;
   final List<ArrayDiskInfo> disks;
-
-  final double? cpuSpeedGhz;
 
   final List<NetworkInterfaceInfo> networkInterfaces;
 
@@ -36,6 +36,7 @@ class SystemStats {
     required this.memTotalBytes,
     required this.memUsedBytes,
     required this.arrayState,
+    required this.capacity,
     required this.disks,
     required this.networkInterfaces,
   });
@@ -56,6 +57,14 @@ class SystemStats {
     final disksJson = (array['disks'] as List?) ?? [];
     final cachesJson = (array['caches'] as List?) ?? [];
 
+    // 顶层 disks 查询里有 SMART 健康状态 / 接口类型 / 序列号，
+    // 按 device 路径（比如 /dev/sdb）跟阵列磁盘信息合并成一份完整数据。
+    final topLevelDisks = (json['disks'] as List?) ?? [];
+    final Map<String, Map<String, dynamic>> detailByDevice = {
+      for (final d in topLevelDisks)
+        if ((d as Map<String, dynamic>)['device'] != null) d['device']: d,
+    };
+
     return SystemStats(
       hostname: os['hostname'] ?? '未知主机',
       distro: os['distro'] ?? '',
@@ -74,8 +83,12 @@ class SystemStats {
       memTotalBytes: _toInt(metricsMem['total']),
       memUsedBytes: _toInt(metricsMem['used']),
       arrayState: array['state'] ?? 'UNKNOWN',
+      capacity: ArrayCapacityInfo.fromJson(array['capacity'] ?? {}),
       disks: [...disksJson, ...cachesJson]
-          .map((d) => ArrayDiskInfo.fromJson(d as Map<String, dynamic>))
+          .map((d) => ArrayDiskInfo.fromJson(
+                d as Map<String, dynamic>,
+                detailByDevice[d['device']],
+              ))
           .toList(),
       networkInterfaces: netList
           .map((n) => NetworkInterfaceInfo.fromJson(n as Map<String, dynamic>))
@@ -130,6 +143,36 @@ class SystemStats {
   }
 }
 
+/// 阵列总容量（跨所有磁盘汇总），对应 array.capacity.kilobytes
+class ArrayCapacityInfo {
+  final int freeKb;
+  final int usedKb;
+  final int totalKb;
+
+  ArrayCapacityInfo({
+    required this.freeKb,
+    required this.usedKb,
+    required this.totalKb,
+  });
+
+  factory ArrayCapacityInfo.fromJson(Map<String, dynamic> json) {
+    final kb = json['kilobytes'] ?? {};
+    return ArrayCapacityInfo(
+      freeKb: SystemStats._toInt(kb['free']),
+      usedKb: SystemStats._toInt(kb['used']),
+      totalKb: SystemStats._toInt(kb['total']),
+    );
+  }
+
+  double get usedPercent {
+    if (totalKb <= 0) return 0;
+    return (usedKb / totalKb * 100).clamp(0, 100);
+  }
+
+  String get usedLabel => ArrayDiskInfo._formatKb(usedKb);
+  String get totalLabel => ArrayDiskInfo._formatKb(totalKb);
+}
+
 class ArrayDiskInfo {
   final String name;
   final String device;
@@ -138,6 +181,13 @@ class ArrayDiskInfo {
   final String type;
   final int fsSizeKb; // 文件系统总容量（KB）
   final int fsUsedKb; // 文件系统已用容量（KB）
+  final bool? isSpinning;
+
+  // 以下字段来自顶层 disks 查询，只有匹配上时才有值
+  final String? smartStatus; // OK / UNKNOWN
+  final String? vendor;
+  final String? interfaceType;
+  final String? serialNum;
 
   ArrayDiskInfo({
     required this.name,
@@ -147,9 +197,17 @@ class ArrayDiskInfo {
     required this.type,
     required this.fsSizeKb,
     required this.fsUsedKb,
+    required this.isSpinning,
+    this.smartStatus,
+    this.vendor,
+    this.interfaceType,
+    this.serialNum,
   });
 
-  factory ArrayDiskInfo.fromJson(Map<String, dynamic> json) {
+  factory ArrayDiskInfo.fromJson(
+    Map<String, dynamic> json, [
+    Map<String, dynamic>? detail,
+  ]) {
     return ArrayDiskInfo(
       name: json['name'] ?? json['device'] ?? '未知磁盘',
       device: json['device'] ?? '',
@@ -158,12 +216,18 @@ class ArrayDiskInfo {
       type: json['type'] ?? 'DATA',
       fsSizeKb: SystemStats._toInt(json['fsSize']),
       fsUsedKb: SystemStats._toInt(json['fsUsed']),
+      isSpinning: json['isSpinning'] is bool ? json['isSpinning'] : null,
+      smartStatus: detail?['smartStatus'],
+      vendor: detail?['vendor'],
+      interfaceType: detail?['interfaceType'],
+      serialNum: detail?['serialNum'],
     );
   }
 
   bool get isHealthy => status == 'DISK_OK';
+  bool get isMounted => status == 'DISK_OK';
 
-  /// 中文健康状态文案
+  /// 中文健康状态文案（基于阵列成员状态）
   String get healthLabel {
     switch (status) {
       case 'DISK_OK':
@@ -186,6 +250,26 @@ class ArrayDiskInfo {
       default:
         return status;
     }
+  }
+
+  /// SMART 健康状态文案（官方 API 目前只提供粗粒度的 OK / 未知两档，
+  /// 没有详细的 SMART 属性表，比如重映射扇区数这类细项拿不到）
+  String get smartLabel {
+    switch (smartStatus) {
+      case 'OK':
+        return 'SMART 正常';
+      case 'UNKNOWN':
+        return 'SMART 未知';
+      default:
+        return '暂无 SMART 数据';
+    }
+  }
+
+  /// 运行状态：运行中 / 休眠 / 未挂载
+  String get runStateLabel {
+    if (!isMounted) return '未挂载';
+    if (isSpinning == null) return '未知';
+    return isSpinning! ? '运行中' : '已休眠';
   }
 
   double get usedPercent {
