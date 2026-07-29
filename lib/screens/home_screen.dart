@@ -7,6 +7,7 @@ import '../services/update_service.dart';
 import '../theme/app_theme.dart';
 import 'dashboard_screen.dart';
 import 'docker_screen.dart';
+import 'vm_screen.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -73,11 +74,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final screens = [
       DashboardScreen(api: _api!),
       DockerScreen(api: _api!),
+      VmScreen(api: _api!),
     ];
+    const titles = ['仪表盘', 'Docker 容器', '虚拟机'];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_tabIndex == 0 ? '仪表盘' : 'Docker 容器'),
+        title: Text(titles[_tabIndex]),
         actions: [
           IconButton(
             onPressed: _logout,
@@ -103,6 +106,10 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.widgets_rounded),
             label: 'Docker',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dvr_rounded),
+            label: '虚拟机',
           ),
         ],
       ),
