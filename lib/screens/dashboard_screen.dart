@@ -333,7 +333,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                 SizedBox(width: 8),
                 Tooltip(
-                  message: '官方 API 暂不提供实时上传/下载速率，这里显示的是连接状态',
+                  message: '官方 API 暂不提供实时上传/下载速率，这里显示的是网卡协商带宽',
                   child: Icon(Icons.info_outline_rounded, size: 15, color: AppColors.textFaint),
                 ),
               ],
@@ -349,14 +349,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.circle,
-                          size: 10, color: n.isConnected ? AppColors.green : AppColors.textFaint),
+                      const Icon(Icons.lan_rounded, size: 16, color: AppColors.textSecondary),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(n.name,
-                            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+                        child: Text(
+                          n.model != null && n.model!.isNotEmpty ? '${n.iface} · ${n.model}' : n.iface,
+                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      Text(n.ipAddress ?? (n.isConnected ? '已连接' : '未连接'),
+                      Text(n.speedLabel,
                           style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                     ],
                   ),
