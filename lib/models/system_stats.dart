@@ -17,7 +17,15 @@ class SystemStats {
   final String arrayState;
   final List<ArrayDiskInfo> disks;
 
-  final List<GpuInfo> gpus;
+  final double? cpuSpeedGhz;
+
+  final double memPercent;
+  final int memTotalBytes;
+  final int memUsedBytes;
+
+  final String arrayState;
+  final List<ArrayDiskInfo> disks;
+
   final List<NetworkInterfaceInfo> networkInterfaces;
 
   SystemStats({
@@ -30,12 +38,12 @@ class SystemStats {
     required this.cpuThreads,
     required this.cpuPercent,
     required this.cpuPackageTemps,
+    required this.cpuSpeedGhz,
     required this.memPercent,
     required this.memTotalBytes,
     required this.memUsedBytes,
     required this.arrayState,
     required this.disks,
-    required this.gpus,
     required this.networkInterfaces,
   });
 
@@ -45,7 +53,6 @@ class SystemStats {
     final cpu = info['cpu'] ?? {};
     final packages = cpu['packages'] ?? {};
     final devices = info['devices'] ?? {};
-    final gpuList = (devices['gpu'] as List?) ?? [];
     final netList = (devices['network'] as List?) ?? [];
 
     final metrics = json['metrics'] ?? {};
@@ -69,15 +76,13 @@ class SystemStats {
           .map((t) => _toDouble(t))
           .where((t) => t > 0)
           .toList(),
+      cpuSpeedGhz: cpu['speed'] == null ? null : _toDouble(cpu['speed']),
       memPercent: _toDouble(metricsMem['percentTotal']),
       memTotalBytes: _toInt(metricsMem['total']),
       memUsedBytes: _toInt(metricsMem['used']),
       arrayState: array['state'] ?? 'UNKNOWN',
       disks: [...disksJson, ...cachesJson]
           .map((d) => ArrayDiskInfo.fromJson(d as Map<String, dynamic>))
-          .toList(),
-      gpus: gpuList
-          .map((g) => GpuInfo.fromJson(g as Map<String, dynamic>))
           .toList(),
       networkInterfaces: netList
           .map((n) => NetworkInterfaceInfo.fromJson(n as Map<String, dynamic>))
@@ -204,22 +209,6 @@ class ArrayDiskInfo {
     if (gb >= 1024) return '${(gb / 1024).toStringAsFixed(1)} TB';
     return '${gb.toStringAsFixed(0)} GB';
   }
-}
-
-class GpuInfo {
-  final String type;
-  final String? vendorName;
-
-  GpuInfo({required this.type, required this.vendorName});
-
-  factory GpuInfo.fromJson(Map<String, dynamic> json) {
-    return GpuInfo(
-      type: json['type'] ?? '未知设备',
-      vendorName: json['vendorname'],
-    );
-  }
-
-  String get displayName => vendorName?.isNotEmpty == true ? vendorName! : type;
 }
 
 class NetworkInterfaceInfo {
