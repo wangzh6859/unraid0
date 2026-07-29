@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// 整个 App 的视觉语言：
 /// 深色底、橙色（Unraid 品牌色）+ 青绿色点缀渐变卡片、圆角大卡片、柔和阴影。
@@ -43,7 +42,10 @@ class AppColors {
 class AppTheme {
   static ThemeData get dark {
     final base = ThemeData.dark(useMaterial3: true);
-    final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
+    // 注意：这里特意不用 google_fonts。google_fonts 默认在 App 启动时
+    // 联网下载字体文件，一旦网络不通或者请求被拦截，会导致启动阶段崩溃。
+    // 改用系统自带字体，不联网、不会闪退，视觉上依然干净清爽。
+    final textTheme = base.textTheme.apply(
       bodyColor: AppColors.textPrimary,
       displayColor: AppColors.textPrimary,
     );
