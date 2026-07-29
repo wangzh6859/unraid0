@@ -107,8 +107,8 @@ class UnraidApi {
       query Dashboard {
         info {
           os { hostname distro uptime }
-          cpu { manufacturer brand cores threads packages { temp totalPower } }
-          devices { gpu { type vendorname } network { iface model speed } }
+          cpu { manufacturer brand cores threads speed packages { temp totalPower } }
+          devices { network { iface model speed } }
         }
         metrics {
           cpu { percentTotal }
