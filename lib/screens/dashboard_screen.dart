@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/system_stats.dart';
 import '../services/unraid_api.dart';
 import '../theme/app_theme.dart';
-import '../widgets/stat_card.dart';
 import '../widgets/usage_ring.dart';
+import 'disk_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final UnraidApi api;
@@ -150,7 +150,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ------- 顶部：主机名 + 运行时间（不再单独占一个方块） -------
+          // ------- 顶部：主机名 + CPU 型号 + 运行时间，信息更紧凑 -------
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -158,6 +158,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               borderRadius: BorderRadius.circular(22),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
@@ -166,25 +167,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Text(
                         stats.hostname,
                         style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 19,
                           fontWeight: FontWeight.w800,
                           color: Colors.black,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
                         stats.distro,
-                        style: const TextStyle(fontSize: 13, color: Colors.black87),
+                        style: const TextStyle(fontSize: 12.5, color: Colors.black87),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Icon(Icons.timelapse_rounded, size: 15, color: Colors.black87),
+                          const Icon(Icons.developer_board_rounded,
+                              size: 14, color: Colors.black87),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              stats.cpuBrand.isNotEmpty
+                                  ? stats.cpuBrand
+                                  : '未知处理器',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          const Icon(Icons.timelapse_rounded, size: 14, color: Colors.black87),
                           const SizedBox(width: 5),
                           Text(
                             '已运行 ${stats.uptimeLabel}',
                             style: const TextStyle(
-                              fontSize: 12.5,
+                              fontSize: 12,
                               color: Colors.black87,
                               fontWeight: FontWeight.w600,
                             ),
@@ -194,7 +218,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                 ),
-                const Icon(Icons.dns_rounded, color: Colors.black, size: 36),
+                const SizedBox(width: 8),
+                const Icon(Icons.dns_rounded, color: Colors.black, size: 32),
               ],
             ),
           ),
@@ -222,7 +247,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Text(
                     '磁盘阵列 · ${_arrayLabel(stats.arrayState)}',
                     style: const TextStyle(
-                        fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                        fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontSize: 13.5),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 if (_arrayBusy)
@@ -251,9 +277,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 16),
 
-          // ------- CPU / 内存 环形使用率 -------
+          // ------- CPU / 内存 环形使用率（温度+频率、已用/总量都合并显示在环下方，不重复摆卡片）-------
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(20),
@@ -262,17 +288,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                UsageRing(
-                  label: 'CPU',
-                  percent: stats.cpuPercent,
-                  color: AppColors.orange,
-                  centerLabel: '${stats.cpuCores}核${stats.cpuThreads}线程',
+                Expanded(
+                  child: Column(
+                    children: [
+                      UsageRing(
+                        label: 'CPU',
+                        percent: stats.cpuPercent,
+                        color: AppColors.orange,
+                        centerLabel: '${stats.cpuCores}核${stats.cpuThreads}线程',
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        cpuTemp != null
+                            ? '${cpuTemp.toStringAsFixed(0)}°C'
+                                '${stats.cpuSpeedGhz != null ? " · ${stats.cpuSpeedGhz!.toStringAsFixed(2)}GHz" : ""}'
+                            : (stats.cpuSpeedGhz != null
+                                ? '${stats.cpuSpeedGhz!.toStringAsFixed(2)}GHz'
+                                : '温度/频率暂不支持'),
+                        style: const TextStyle(fontSize: 11.5, color: AppColors.textFaint),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
-                UsageRing(
-                  label: '内存',
-                  percent: stats.memPercent,
-                  color: AppColors.teal,
-                  centerLabel: stats.memTotalLabel,
+                Expanded(
+                  child: Column(
+                    children: [
+                      UsageRing(
+                        label: '内存',
+                        percent: stats.memPercent,
+                        color: AppColors.teal,
+                        centerLabel: '',
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${stats.memUsedLabel} / ${stats.memTotalLabel}',
+                        style: const TextStyle(fontSize: 11.5, color: AppColors.textFaint),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -280,51 +335,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 16),
 
-          // ------- 详细信息网格 -------
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.35,
-            children: [
-              StatCard(
-                title: 'CPU 温度',
-                value: cpuTemp != null ? '${cpuTemp.toStringAsFixed(0)}°C' : '暂不支持',
-                icon: Icons.thermostat_rounded,
-                gradient: AppColors.gradientPrimary,
-                subtitle: cpuTemp == null ? '需要主板传感器数据' : null,
+          // ------- 存储空间总览（跨所有磁盘汇总的已用/总计） -------
+          if (stats.capacity.totalKb > 0)
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border),
               ),
-              StatCard(
-                title: 'CPU 型号',
-                value: stats.cpuBrand.isNotEmpty
-                    ? stats.cpuBrand.split(' ').take(3).join(' ')
-                    : '未知',
-                icon: Icons.developer_board_rounded,
-                gradient: AppColors.gradientBlue,
-                subtitle: stats.cpuManufacturer.isNotEmpty ? stats.cpuManufacturer : null,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.sd_storage_rounded, size: 18, color: AppColors.textSecondary),
+                      const SizedBox(width: 8),
+                      const Text('存储空间',
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      const Spacer(),
+                      Text('${stats.capacity.usedPercent.toStringAsFixed(0)}%',
+                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: stats.capacity.usedPercent / 100,
+                      minHeight: 8,
+                      backgroundColor: AppColors.border,
+                      valueColor: const AlwaysStoppedAnimation(AppColors.teal),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '已用 ${stats.capacity.usedLabel} / 共 ${stats.capacity.totalLabel}',
+                    style: const TextStyle(fontSize: 12.5, color: AppColors.textFaint),
+                  ),
+                ],
               ),
-              StatCard(
-                title: '内存占用',
-                value: stats.memUsedLabel,
-                icon: Icons.memory_rounded,
-                gradient: AppColors.gradientTeal,
-                subtitle: '共 ${stats.memTotalLabel}',
-              ),
-              StatCard(
-                title: 'CPU 频率',
-                value: stats.cpuSpeedGhz != null
-                    ? '${stats.cpuSpeedGhz!.toStringAsFixed(2)} GHz'
-                    : '暂不支持',
-                icon: Icons.speed_rounded,
-                gradient: LinearGradient(
-                    colors: [AppColors.blue, AppColors.blue.withValues(alpha: 0.6)]),
-              ),
-            ],
-          ),
+            ),
 
-          // ------- 网络接口（官方 API 只有链路状态，没有实时速率） -------
+          // ------- 网络接口 -------
           if (stats.networkInterfaces.isNotEmpty) ...[
             const SizedBox(height: 24),
             Row(
@@ -366,7 +420,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 )),
           ],
 
-          // ------- 磁盘列表：温度 + 容量 + 健康状态 -------
+          // ------- 磁盘列表：点击进入详情（健康/SMART/运行状态/容量）-------
           if (stats.disks.isNotEmpty) ...[
             const SizedBox(height: 24),
             const Text(
@@ -374,72 +428,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 12),
-            ...stats.disks.map((d) => Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
+            ...stats.disks.map((d) => InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => DiskDetailScreen(disk: d)),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.circle,
-                              size: 9, color: d.isHealthy ? AppColors.green : AppColors.red),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(d.name,
-                                style: const TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600)),
-                          ),
-                          if (d.tempC != null)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 10),
-                              child: Text('${d.tempC}°C',
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.circle,
+                            size: 9, color: d.isHealthy ? AppColors.green : AppColors.red),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(d.name,
                                   style: const TextStyle(
-                                      color: AppColors.textSecondary, fontSize: 13)),
-                            ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: (d.isHealthy ? AppColors.green : AppColors.red)
-                                  .withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              d.healthLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: d.isHealthy ? AppColors.green : AppColors.red,
+                                      color: AppColors.textPrimary,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600),
+                                  overflow: TextOverflow.ellipsis),
+                              const SizedBox(height: 2),
+                              Text(
+                                d.fsSizeKb > 0
+                                    ? '${d.runStateLabel} · 已用 ${d.usedLabel}/${d.totalLabel}'
+                                    : d.runStateLabel,
+                                style: const TextStyle(fontSize: 12, color: AppColors.textFaint),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
+                            ],
                           ),
+                        ),
+                        if (d.tempC != null) ...[
+                          Text('${d.tempC}°C',
+                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                          const SizedBox(width: 6),
                         ],
-                      ),
-                      if (d.fsSizeKb > 0) ...[
-                        const SizedBox(height: 10),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: LinearProgressIndicator(
-                            value: d.usedPercent / 100,
-                            minHeight: 6,
-                            backgroundColor: AppColors.border,
-                            valueColor: const AlwaysStoppedAnimation(AppColors.teal),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '已用 ${d.usedLabel} / 共 ${d.totalLabel}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.textFaint),
-                        ),
+                        const Icon(Icons.chevron_right_rounded,
+                            size: 20, color: AppColors.textFaint),
                       ],
-                    ],
+                    ),
                   ),
                 )),
           ],
