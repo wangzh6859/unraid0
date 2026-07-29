@@ -19,13 +19,6 @@ class SystemStats {
 
   final double? cpuSpeedGhz;
 
-  final double memPercent;
-  final int memTotalBytes;
-  final int memUsedBytes;
-
-  final String arrayState;
-  final List<ArrayDiskInfo> disks;
-
   final List<NetworkInterfaceInfo> networkInterfaces;
 
   SystemStats({
