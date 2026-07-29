@@ -1,124 +1,49 @@
-name: Build & Release APK
+name: unraid_mobile
+description: "一个用于远程管理 Unraid NAS 的手机应用"
+publish_to: 'none'
 
-# 只支持手动触发：把这次要改的所有文件都上传/提交完之后，
-# 再去仓库的 Actions 标签页 -> Build & Release APK -> Run workflow 手动点一下。
-# 这样就不会出现"改一个文件就自动跑一次、改十次就跑十次"的情况。
-on:
-  workflow_dispatch:
+# version 会在 CI 构建时通过 --build-name / --build-number 覆盖，
+# 这里的值仅用于本地开发时的占位。
+version: 1.0.0+1
 
-permissions:
-  contents: write
+environment:
+  sdk: '>=3.4.0 <4.0.0'
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: 拉取代码
-        uses: actions/checkout@v4
-        with:
-          # 拉取完整提交历史和所有 tag，否则下面生成"本次更新内容"时
-          # 找不到上一个版本的 tag，也拿不到完整的 commit 记录。
-          fetch-depth: 0
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
 
-      - name: 安装 Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.29.0'
-          channel: 'stable'
-          cache: true
+  # 网络请求（GraphQL over HTTP）
+  http: ^1.2.2
 
-      - name: 生成 Android 平台工程（首次会创建 android/ 目录，已存在的文件不会被覆盖）
-        run: flutter create --platforms=android --org com.zhaohongli --project-name unraid_mobile .
+  # 本地存储（NAS地址 / API Key / 主题偏好）
+  shared_preferences: ^2.3.2
 
-      - name: 应用自定义签名构建配置
-        run: cp android_overrides/app_build.gradle.kts android/app/build.gradle.kts
+  # 点击后用系统浏览器打开 GitHub Release 页面下载新 APK
+  url_launcher: ^6.3.1
 
-      - name: 修改应用显示名为 UnRaid
-        run: |
-          sed -i 's/android:label="[^"]*"/android:label="UnRaid"/' \
-            android/app/src/main/AndroidManifest.xml
+  # 读取当前已安装 App 的版本号，用于"检查更新"对比
+  package_info_plus: ^8.1.1
 
-      - name: 确认已声明网络权限（避免联网请求被系统拦截导致崩溃）
-        run: |
-          if ! grep -q "android.permission.INTERNET" android/app/src/main/AndroidManifest.xml; then
-            sed -i 's#<manifest xmlns:android="http://schemas.android.com/apk/res/android">#<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />#' \
-              android/app/src/main/AndroidManifest.xml
-          fi
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  # 用于根据 assets/icon.png 自动生成所有分辨率的启动图标
+  flutter_launcher_icons: ^0.14.3
 
-      - name: 解码签名证书
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::error::缺少 KEYSTORE_BASE64 secret，请先运行 generate-keystore.yml 生成证书并把它设置到仓库 Secrets 中"
-            exit 1
-          fi
-          echo "$KEYSTORE_BASE64" | base64 -d > android/app/release.jks
+# flutter_launcher_icons 的配置：
+# - image_path 是传统图标（旧版 Android / 兼容用）
+# - adaptive_icon_background / adaptive_icon_foreground 是 Android 8.0+
+#   的自适应图标（系统会自动做圆形/圆角方形等裁切）
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: false
+  image_path: "assets/icon.png"
+  adaptive_icon_background: "assets/icon_background.png"
+  adaptive_icon_foreground: "assets/icon_foreground.png"
+  min_sdk_android: 23
 
-      - name: 写入 key.properties
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          cat > android/key.properties <<EOF
-          storeFile=release.jks
-          storePassword=$KEYSTORE_PASSWORD
-          keyAlias=$KEY_ALIAS
-          keyPassword=$KEY_PASSWORD
-          EOF
-
-      - name: 获取依赖
-        run: flutter pub get
-
-      - name: 生成新版启动图标
-        run: dart run flutter_launcher_icons
-
-      - name: 构建 Release APK
-        run: |
-          BUILD_NUMBER="${{ github.run_number }}"
-          # versionCode 用 GitHub Actions 的运行次数，保证每次构建都严格递增，
-          # 这是手机能够"原地升级安装"而不需要先卸载旧版的关键条件之一
-          # （另一个条件是每次都用同一份签名证书，已经在上面处理）。
-          flutter build apk --release \
-            --build-name="1.0.$BUILD_NUMBER" \
-            --build-number="$BUILD_NUMBER"
-
-      - name: 重命名产物
-        run: |
-          mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-release.apk \
-             "dist/unraid-mobile-1.0.${{ github.run_number }}.apk"
-
-      - name: 生成本次更新内容（对比上一个 tag 到现在的 commit）
-        id: changelog
-        run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          {
-            echo "changelog<<EOF"
-            if [ -n "$PREV_TAG" ]; then
-              echo "自 $PREV_TAG 以来的改动："
-              echo ""
-              git log "$PREV_TAG"..HEAD --pretty=format:"- %s（%an）"
-            else
-              echo "首个自动构建版本"
-            fi
-            echo ""
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: 创建 GitHub Release 并上传 APK
-        uses: softprops/action-gh-release@v2
-        with:
-          # 每次运行的 tag 都不一样（跟 Actions 运行次数挂钩），
-          # 所以每次都会新建一个 Release，旧版本 Release 会原样保留，不会被覆盖。
-          tag_name: v1.0.${{ github.run_number }}
-          name: UnRaid v1.0.${{ github.run_number }}
-          body: |
-            ${{ steps.changelog.outputs.changelog }}
-
-            ---
-            commit: ${{ github.sha }}
-
-            手机上直接点击下方 apk 文件下载并安装即可，会自动覆盖升级旧版本，无需先卸载。
-          files: dist/*.apk
+flutter:
+  uses-material-design: true
