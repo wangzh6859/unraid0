@@ -21,7 +21,11 @@ if (hasKeystore) {
 }
 
 android {
-    namespace = "com.zhaohongli.unraidmobile"
+    // 必须和 flutter create --org com.zhaohongli --project-name unraid_mobile
+    // 实际生成的 Kotlin 包路径完全一致：android/app/src/main/kotlin/com/zhaohongli/unraid_mobile/MainActivity.kt
+    // 之前这里少了下划线（写成 unraidmobile），会导致系统按 AndroidManifest
+    // 里的 ".MainActivity" 找不到真正的类，启动时立刻崩溃、连界面都进不去。
+    namespace = "com.zhaohongli.unraid_mobile"
     compileSdk = flutter.compileSdkVersion
     // 显式指定为插件里要求的最高 NDK 版本（package_info_plus /
     // shared_preferences_android / url_launcher_android 等都要求 27.x），
@@ -38,9 +42,9 @@ android {
     }
 
     defaultConfig {
-        // 应用唯一包名：这个值必须永远保持不变，否则手机会把新版本
-        // 当成"另一个 App"，无法实现原地升级安装。
-        applicationId = "com.zhaohongli.unraidmobile"
+        // 应用唯一包名：必须和上面的 namespace 保持一致，永远不要改动，
+        // 否则手机会把新版本当成"另一个 App"，无法实现原地升级安装。
+        applicationId = "com.zhaohongli.unraid_mobile"
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
         // versionCode / versionName 由 CI 通过
