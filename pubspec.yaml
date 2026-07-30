@@ -7,7 +7,9 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.4.0 <4.0.0'
+  # flutter_launcher_icons 0.14.x 要求 Dart SDK >= 3.7.0（Flutter 3.29 自带的就是 3.7），
+  # 之前写的 >=3.4.0 太低，会导致 pub 依赖解析失败（Failed to update packages）。
+  sdk: '>=3.7.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -25,6 +27,9 @@ dependencies:
 
   # 读取当前已安装 App 的版本号，用于"检查更新"对比
   package_info_plus: ^8.1.1
+
+  # SSH 连接（用于官方 API 覆盖不到的功能：重启/关机、实时网速、完整 SMART、文件管理）
+  dartssh2: ^2.11.0
 
 dev_dependencies:
   flutter_test:
