@@ -112,7 +112,7 @@ class UnraidApi {
         }
         metrics {
           cpu { percentTotal }
-          memory { percentTotal total used }
+          memory { percentTotal total used available }
         }
         array {
           state
