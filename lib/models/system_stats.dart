@@ -79,9 +79,14 @@ class SystemStats {
           .where((t) => t > 0)
           .toList(),
       cpuSpeedGhz: cpu['speed'] == null ? null : _toDouble(cpu['speed']),
-      memPercent: _toDouble(metricsMem['percentTotal']),
+      memPercent: _memPercentFromAvailable(metricsMem),
       memTotalBytes: _toInt(metricsMem['total']),
-      memUsedBytes: _toInt(metricsMem['used']),
+      // 注意：接口的 memory.used 字段在 Linux 上会把可回收的磁盘缓存/缓冲区
+      // 也算进去，数值明显偏高，跟 Unraid 官方网页版看到的"已用"对不上。
+      // 改用 total - available 计算真实已用量（available 是"刨除可回收缓存后
+      // 实际可用的内存"），百分比也用同一个口径反推，保证环形图和下面的
+      // "已用 X / 共 Y" 永远一致，且跟 Unraid 自己网页版的数字对得上。
+      memUsedBytes: _toInt(metricsMem['total']) - _toInt(metricsMem['available']),
       arrayState: array['state'] ?? 'UNKNOWN',
       capacity: ArrayCapacityInfo.fromJson(array['capacity'] ?? {}),
       disks: [...disksJson, ...cachesJson]
@@ -101,6 +106,13 @@ class SystemStats {
     if (v is double) return v;
     if (v is int) return v.toDouble();
     return double.tryParse('$v') ?? 0;
+  }
+
+  static double _memPercentFromAvailable(Map metricsMem) {
+    final total = _toInt(metricsMem['total']);
+    final available = _toInt(metricsMem['available']);
+    if (total <= 0) return 0;
+    return ((total - available) / total * 100).clamp(0, 100);
   }
 
   static int _toInt(dynamic v) {
