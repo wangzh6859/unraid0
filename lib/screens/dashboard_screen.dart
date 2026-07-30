@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/system_stats.dart';
+import '../services/ssh_service.dart';
 import '../services/unraid_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/usage_ring.dart';
@@ -7,7 +8,15 @@ import 'disk_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final UnraidApi api;
-  const DashboardScreen({super.key, required this.api});
+  final SshCredentials? sshCredentials;
+  final VoidCallback? onOpenSshSettings;
+
+  const DashboardScreen({
+    super.key,
+    required this.api,
+    this.sshCredentials,
+    this.onOpenSshSettings,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -18,6 +27,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _error;
   bool _loading = true;
   bool _arrayBusy = false;
+  bool _powerBusy = false;
 
   @override
   void initState() {
@@ -115,6 +125,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _powerAction({required bool isReboot}) async {
+    if (widget.sshCredentials == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('还没配置 SSH，重启/关机需要先在右上角设置一下'),
+          action: widget.onOpenSshSettings != null
+              ? SnackBarAction(label: '去设置', onPressed: widget.onOpenSshSettings!)
+              : null,
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceElevated,
+        title: Text(isReboot ? '重启 NAS？' : '关机？'),
+        content: Text(isReboot
+            ? '这会立即重启整台 NAS，所有 Docker 容器和虚拟机都会被中断，确认要继续吗？'
+            : '这会立即关闭整台 NAS，关机后需要手动按电源键才能开机，确认要继续吗？'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isReboot ? '重启' : '关机', style: const TextStyle(color: AppColors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _powerBusy = true);
+    try {
+      final ssh = SshService(widget.sshCredentials!);
+      if (isReboot) {
+        await ssh.reboot();
+      } else {
+        await ssh.shutdown();
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(isReboot ? '重启指令已发送' : '关机指令已发送')),
+        );
+      }
+    } on SshException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _powerBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading && _stats == null) {
@@ -150,76 +214,102 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ------- 顶部：主机名 + CPU 型号 + 运行时间，信息更紧凑 -------
+          // ------- 顶部：只保留主机名 + 系统版本 + 运行时间，左右均衡，更紧凑 -------
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             decoration: BoxDecoration(
               gradient: AppColors.gradientPrimary,
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.dns_rounded, color: Colors.black, size: 24),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         stats.hostname,
                         style: const TextStyle(
-                          fontSize: 19,
+                          fontSize: 17,
                           fontWeight: FontWeight.w800,
                           color: Colors.black,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 2),
                       Text(
                         stats.distro,
-                        style: const TextStyle(fontSize: 12.5, color: Colors.black87),
+                        style: const TextStyle(fontSize: 12, color: Colors.black87),
                         overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Icon(Icons.developer_board_rounded,
-                              size: 14, color: Colors.black87),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              stats.cpuBrand.isNotEmpty
-                                  ? stats.cpuBrand
-                                  : '未知处理器',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.black87,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 5),
-                      Row(
-                        children: [
-                          const Icon(Icons.timelapse_rounded, size: 14, color: Colors.black87),
-                          const SizedBox(width: 5),
-                          Text(
-                            '已运行 ${stats.uptimeLabel}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.black87,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.dns_rounded, color: Colors.black, size: 32),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.timelapse_rounded, size: 15, color: Colors.black87),
+                          const SizedBox(height: 2),
+                          Text(
+                            stats.uptimeLabel,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (_powerBusy)
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.black87),
+                      )
+                    else
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _headerIconButton(
+                            icon: Icons.restart_alt_rounded,
+                            tooltip: '重启 NAS',
+                            onTap: () => _powerAction(isReboot: true),
+                          ),
+                          const SizedBox(width: 6),
+                          _headerIconButton(
+                            icon: Icons.power_settings_new_rounded,
+                            tooltip: '关机',
+                            onTap: () => _powerAction(isReboot: false),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -298,6 +388,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         centerLabel: '${stats.cpuCores}核${stats.cpuThreads}线程',
                       ),
                       const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Text(
+                          stats.cpuBrand.isNotEmpty ? stats.cpuBrand : '未知处理器',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
                       Text(
                         cpuTemp != null
                             ? '${cpuTemp.toStringAsFixed(0)}°C'
@@ -482,6 +587,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+
+  Widget _headerIconButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 16, color: Colors.black87),
+        ),
       ),
     );
   }
