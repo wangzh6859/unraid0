@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../services/ssh_service.dart';
 import '../services/storage_service.dart';
 import '../services/unraid_api.dart';
 import '../services/update_service.dart';
 import '../theme/app_theme.dart';
 import 'dashboard_screen.dart';
 import 'docker_screen.dart';
+import 'files_screen.dart';
 import 'vm_screen.dart';
 import 'login_screen.dart';
-import 'ssh_settings_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,7 +22,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _tabIndex = 0;
   UnraidApi? _api;
-  SshCredentials? _sshCreds;
   final _storage = StorageService();
   UpdateInfo? _updateInfo;
 
@@ -41,24 +40,20 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       return;
     }
-    final sshCreds = await _storage.loadSsh();
     setState(() {
       _api = UnraidApi(
         host: saved['host'],
         apiKey: saved['apiKey'],
         useHttps: saved['useHttps'] ?? false,
       );
-      _sshCreds = sshCreds;
     });
     _checkUpdate();
   }
 
-  Future<void> _openSshSettings() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SshSettingsScreen()),
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
-    final sshCreds = await _storage.loadSsh();
-    if (mounted) setState(() => _sshCreds = sshCreds);
   }
 
   Future<void> _checkUpdate() async {
@@ -85,24 +80,22 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final screens = [
-      DashboardScreen(api: _api!, sshCredentials: _sshCreds, onOpenSshSettings: _openSshSettings),
+      DashboardScreen(api: _api!),
       DockerScreen(api: _api!),
       VmScreen(api: _api!),
+      const FilesScreen(),
     ];
-    const titles = ['仪表盘', 'Docker 容器', '虚拟机'];
+    const titles = ['仪表盘', 'Docker 容器', '虚拟机', '文件管理'];
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          onPressed: _openSettings,
+          icon: const Icon(Icons.settings_rounded),
+          tooltip: '设置',
+        ),
         title: Text(titles[_tabIndex]),
         actions: [
-          IconButton(
-            onPressed: _openSshSettings,
-            icon: Icon(
-              Icons.terminal_rounded,
-              color: _sshCreds != null ? AppColors.teal : null,
-            ),
-            tooltip: 'SSH 连接设置',
-          ),
           IconButton(
             onPressed: _logout,
             icon: const Icon(Icons.logout_rounded),
@@ -112,13 +105,14 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          if (_updateInfo != null) _buildUpdateBanner(_updateInfo!),
+          if (_tabIndex == 0 && _updateInfo != null) _buildUpdateBanner(_updateInfo!),
           Expanded(child: screens[_tabIndex]),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _tabIndex,
         onTap: (i) => setState(() => _tabIndex = i),
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.speed_rounded),
@@ -131,6 +125,10 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.dvr_rounded),
             label: '虚拟机',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.folder_rounded),
+            label: '文件',
           ),
         ],
       ),
