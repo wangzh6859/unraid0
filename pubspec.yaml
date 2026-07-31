@@ -28,8 +28,8 @@ dependencies:
   # 读取当前已安装 App 的版本号，用于"检查更新"对比
   package_info_plus: ^8.1.1
 
-  # SSH 连接（用于官方 API 覆盖不到的功能：重启/关机、实时网速、完整 SMART、文件管理）
-  dartssh2: ^2.11.0
+  # WebDAV 文件管理（对接 OpenList 等 WebDAV 服务）
+  webdav_client: ^1.2.1
 
 dev_dependencies:
   flutter_test:
