@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/system_stats.dart';
-import '../services/ssh_service.dart';
 import '../services/unraid_api.dart';
 import '../theme/app_theme.dart';
 import '../widgets/usage_ring.dart';
@@ -8,14 +7,10 @@ import 'disk_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final UnraidApi api;
-  final SshCredentials? sshCredentials;
-  final VoidCallback? onOpenSshSettings;
 
   const DashboardScreen({
     super.key,
     required this.api,
-    this.sshCredentials,
-    this.onOpenSshSettings,
   });
 
   @override
@@ -27,7 +22,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _error;
   bool _loading = true;
   bool _arrayBusy = false;
-  bool _powerBusy = false;
 
   @override
   void initState() {
@@ -122,60 +116,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } finally {
       if (mounted) setState(() => _arrayBusy = false);
-    }
-  }
-
-  Future<void> _powerAction({required bool isReboot}) async {
-    if (widget.sshCredentials == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('还没配置 SSH，重启/关机需要先在右上角设置一下'),
-          action: widget.onOpenSshSettings != null
-              ? SnackBarAction(label: '去设置', onPressed: widget.onOpenSshSettings!)
-              : null,
-        ),
-      );
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceElevated,
-        title: Text(isReboot ? '重启 NAS？' : '关机？'),
-        content: Text(isReboot
-            ? '这会立即重启整台 NAS，所有 Docker 容器和虚拟机都会被中断，确认要继续吗？'
-            : '这会立即关闭整台 NAS，关机后需要手动按电源键才能开机，确认要继续吗？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(isReboot ? '重启' : '关机', style: const TextStyle(color: AppColors.red)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    setState(() => _powerBusy = true);
-    try {
-      final ssh = SshService(widget.sshCredentials!);
-      if (isReboot) {
-        await ssh.reboot();
-      } else {
-        await ssh.shutdown();
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(isReboot ? '重启指令已发送' : '关机指令已发送')),
-        );
-      }
-    } on SshException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    } finally {
-      if (mounted) setState(() => _powerBusy = false);
     }
   }
 
@@ -284,30 +224,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    if (_powerBusy)
-                      const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.black87),
-                      )
-                    else
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _headerIconButton(
-                            icon: Icons.restart_alt_rounded,
-                            tooltip: '重启 NAS',
-                            onTap: () => _powerAction(isReboot: true),
-                          ),
-                          const SizedBox(width: 6),
-                          _headerIconButton(
-                            icon: Icons.power_settings_new_rounded,
-                            tooltip: '关机',
-                            onTap: () => _powerAction(isReboot: false),
-                          ),
-                        ],
-                      ),
                   ],
                 ),
               ],
@@ -587,28 +503,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 24),
         ],
-      ),
-    );
-  }
-
-  Widget _headerIconButton({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onTap,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, size: 16, color: Colors.black87),
-        ),
       ),
     );
   }
