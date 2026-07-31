@@ -138,7 +138,7 @@ class WebdavService {
       await _client.rename(
         isDir ? '$oldPath/' : oldPath,
         isDir ? '$newPath/' : newPath,
-        overwrite: false,
+        false,
       );
     } catch (e) {
       throw WebdavException('重命名失败：$e');
